@@ -1,177 +1,155 @@
-# ☁️ CloudVerse — 10-Microservice DevOps Demo on AWS EKS
+# 🌩️ CloudVerse — Microservices Platform on AWS EKS
 
-> A production-grade, visually stunning microservices e-learning platform built to teach DevOps students real-world concepts:
->
-> Docker → ECR → Kubernetes (EKS)
+CloudVerse is a real-world microservices platform deployed on **AWS EKS** using:
 
----
-
-# 📌 What This Project Demonstrates
-
-| Concept         | How It's Shown                      |
-| --------------- | ----------------------------------- |
-| Microservices   | 10 independent services             |
-| Docker + ECR    | Each service has its own Dockerfile |
-| EKS             | All resources deployed on AWS EKS   |
-| ALB Ingress     | Single entry point                  |
-| HPA             | Auto scaling                        |
-| PV/PVC          | PostgreSQL persistence              |
-| Node Affinity   | DB scheduled on labeled nodes       |
-| Probes          | Liveness + Readiness                |
-| Rolling Updates | Zero downtime deployment            |
-
----
-
-# 🏗️ Architecture
-
-```text
-Internet
-   │
-   ▼
-AWS ALB Ingress
-   │
-   ▼
-UI Service (React)
-   │
-   ▼
-API Gateway
-   │
-   ├── Auth Service
-   ├── User Service
-   ├── Product Service
-   ├── Order Service ──► Notification Service
-   ├── Cart Service
-   ├── Analytics Service
-   └── Search Service
-
-PostgreSQL Database
-```
+- ✅ Docker  
+- ✅ Amazon ECR  
+- ✅ Kubernetes (EKS)  
+- ✅ AWS ALB Ingress  
+- ✅ EBS Persistent Volume  
+- ✅ HPA (Horizontal Pod Autoscaler)  
+- ✅ Node Affinity  
+- ✅ Liveness & Readiness Probes  
 
 ---
 
 # 📁 Project Structure
 
-```text
+```
 cloudverse/
 ├── README.md
 ├── services/
-│   ├── ui/
-│   ├── api-gateway/
-│   ├── auth-service/
-│   ├── user-service/
-│   ├── product-service/
-│   ├── order-service/
-│   ├── cart-service/
-│   ├── notification-service/
-│   ├── analytics-service/
-│   └── search-service/
+│ ├── ui/                       ← React frontend
+│ ├── api-gateway/              ← Routes all /api/* requests
+│ ├── auth-service/             ← Login, Register → PostgreSQL
+│ ├── user-service/             ← User profiles → PostgreSQL
+│ ├── product-service/          ← Product catalog
+│ ├── order-service/            ← Orders + calls notification-service
+│ ├── cart-service/             ← Shopping cart (in-memory)
+│ ├── notification-service/     ← Receives calls from order-service
+│ ├── analytics-service/        ← Platform stats
+│ └── search-service/           ← Product search
 └── k8s-manifests/
+├── 00-namespace.yaml
+├── 01-postgres-pv-pvc.yaml           ← PV/PVC (EBS)
+├── 02-postgres-secret.yaml           ← DB credentials
+├── 03-postgres-deployment.yaml       ← Node Affinity + Probes
+├── 04-postgres-service.yaml          ← ClusterIP
+├── 05-auth-service.yaml
+├── 06-user-service.yaml
+├── 07-product-service.yaml
+├── 08-order-service.yaml
+├── 09-cart-service.yaml
+├── 10-notification-service.yaml
+├── 11-analytics-service.yaml
+├── 12-search-service.yaml
+├── 13-api-gateway.yaml
+├── 14-ui-service.yaml
+├── 15-ingress.yaml                   ← AWS ALB Ingress
+└── 16-hpa.yaml                       ← HPA for 4 services
 ```
 
 ---
 
 # ⚙️ Prerequisites
 
-* AWS Account
-* EKS Cluster
-* Docker
-* kubectl
-* AWS CLI
-* Metrics Server
-* AWS Load Balancer Controller
-* EBS CSI Driver
+| Requirement | Details |
+|------------|----------|
+| AWS Account | With running EKS cluster |
+| EC2 Instance | Amazon Linux 2 (t2.micro) |
+| Docker | Installed |
+| AWS CLI | Configured |
+| kubectl | Connected to EKS |
+| AWS Load Balancer Controller | Installed |
+| EBS CSI Driver | Installed |
+| Metrics Server | Installed |
 
 ---
 
-# 🚀 Deployment Guide
+# 🚀 Step‑By‑Step Deployment Guide
 
 ---
 
-# 🔧 Install Docker
+# 🔧 PHASE 1 — Prepare EC2 Instance
 
-```bash
+## Step 1 — Install Docker
+
+```
 sudo yum update -y
 sudo yum install -y docker
 sudo service docker start
 sudo usermod -aG docker ec2-user
 newgrp docker
-
 docker --version
 ```
 
----
+## Step 2 — Install AWS CLI
 
-# 🔧 Install AWS CLI
-
-```bash
+```
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-
 unzip awscliv2.zip
-
 sudo ./aws/install
-
 aws --version
 ```
 
----
+## Step 3 — Configure AWS CLI
 
-# 🔧 Configure AWS CLI
-
-```bash
+```
 aws configure
 ```
 
----
+## Step 4 — Install kubectl
 
-# 🔧 Install kubectl
-
-```bash
+```
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-
 chmod +x kubectl
-
 sudo mv kubectl /usr/local/bin/
-
 kubectl version --client
 ```
 
----
+## Step 5 — Connect to EKS
 
-# 🔧 Connect kubectl to EKS
-
-```bash
-aws eks update-kubeconfig \
-  --region us-east-1 \
-  --name <your-cluster-name>
-
+```
+aws eks update-kubeconfig --region us-east-1 --name <your-eks-cluster-name>
 kubectl get nodes
 ```
 
 ---
 
-# 📦 Create ECR Repositories
+# 📦 PHASE 2 — Create ECR Repositories
 
-```bash
+## Step 6 — Create All 10 Repositories
+
+```
 export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-
 export AWS_REGION=us-east-1
+
+aws ecr create-repository --repository-name cloudverse/ui-service --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/api-gateway --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/auth-service --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/user-service --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/product-service --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/order-service --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/cart-service --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/notification-service --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/analytics-service --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/search-service --region $AWS_REGION
 ```
 
 ---
 
-```bash
-aws ecr create-repository --repository-name cloudverse/ui-service
+# 🐳 PHASE 3 — Clone, Build, Tag and Push
 
-aws ecr create-repository --repository-name cloudverse/api-gateway
+## Step 7 — Clone the Repository
 
-aws ecr create-repository --repository-name cloudverse/auth-service
+```
+git clone https://github.com/<your-org>/cloudverse.git
+cd cloudverse
 ```
 
----
+## Step 8 — Authenticate Docker with ECR
 
-# 🐳 Login Docker to ECR
-
-```bash
+```
 aws ecr get-login-password --region us-east-1 \
 | docker login --username AWS \
 --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
@@ -179,152 +157,160 @@ aws ecr get-login-password --region us-east-1 \
 
 ---
 
-# 🐳 Build UI Docker Image
+## Step 9 — Build, Tag and Push All Images
 
-```bash
+### 🖥️ UI Service
+
+```
 docker build -t cloudverse-ui ./services/ui
+docker tag cloudverse-ui:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/ui-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/ui-service:v1
+```
 
-docker tag cloudverse-ui:latest \
-${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/ui-service:v1
+### 🔀 API Gateway
 
-docker push \
-${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/ui-service:v1
+```
+docker build -t cloudverse-api-gateway ./services/api-gateway
+docker tag cloudverse-api-gateway:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/api-gateway:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/api-gateway:v1
+```
+
+### 🔐 Auth Service
+
+```
+docker build -t cloudverse-auth-service ./services/auth-service
+docker tag cloudverse-auth-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/auth-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/auth-service:v1
+```
+
+### 👤 User Service
+
+```
+docker build -t cloudverse-user-service ./services/user-service
+docker tag cloudverse-user-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/user-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/user-service:v1
+```
+
+### 🛍️ Product Service
+
+```
+docker build -t cloudverse-product-service ./services/product-service
+docker tag cloudverse-product-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/product-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/product-service:v1
+```
+
+### 📦 Order Service
+
+```
+docker build -t cloudverse-order-service ./services/order-service
+docker tag cloudverse-order-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/order-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/order-service:v1
+```
+
+### 🛒 Cart Service
+
+```
+docker build -t cloudverse-cart-service ./services/cart-service
+docker tag cloudverse-cart-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/cart-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/cart-service:v1
+```
+
+### 🔔 Notification Service
+
+```
+docker build -t cloudverse-notification-service ./services/notification-service
+docker tag cloudverse-notification-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/notification-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/notification-service:v1
+```
+
+### 📊 Analytics Service
+
+```
+docker build -t cloudverse-analytics-service ./services/analytics-service
+docker tag cloudverse-analytics-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/analytics-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/analytics-service:v1
+```
+
+### 🔍 Search Service
+
+```
+docker build -t cloudverse-search-service ./services/search-service
+docker tag cloudverse-search-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/search-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/search-service:v1
 ```
 
 ---
 
-# 🔖 Update Image URIs
+# 🔖 PHASE 4 — Update Image URIs
 
-```bash
+```
 sed -i "s/YOUR_ACCOUNT_ID/${AWS_ACCOUNT_ID}/g" k8s-manifests/*.yaml
+grep "ecr" k8s-manifests/05-auth-service.yaml
 ```
 
 ---
 
-# 🏷️ Label Database Node
+# 🏷️ PHASE 5 — Label Node for Database
 
-```bash
+```
 kubectl get nodes
-
 kubectl label node <node-name> role=database
-
 kubectl label node <node-name> node-type=storage-optimized
+kubectl get nodes --show-labels
 ```
 
 ---
 
-# ☸️ Deploy to Kubernetes
+# ☸️ PHASE 6 — Deploy to Kubernetes
 
-```bash
-kubectl apply -f k8s-manifests/00-namespace.yaml
-
-kubectl apply -f k8s-manifests/01-postgres-pv-pvc.yaml
-
-kubectl apply -f k8s-manifests/02-postgres-secret.yaml
-
-kubectl apply -f k8s-manifests/03-postgres-deployment.yaml
-
-kubectl apply -f k8s-manifests/04-postgres-service.yaml
+```
+kubectl apply -f k8s-manifests/
+kubectl rollout status deployment/postgres -n cloudverse
 ```
 
 ---
 
-# 🚀 Deploy All Services
+# ✅ PHASE 7 — Verify Everything
 
-```bash
-kubectl apply -f k8s-manifests/05-auth-service.yaml
-
-kubectl apply -f k8s-manifests/06-user-service.yaml
-
-kubectl apply -f k8s-manifests/07-product-service.yaml
-
-kubectl apply -f k8s-manifests/08-order-service.yaml
-
-kubectl apply -f k8s-manifests/09-cart-service.yaml
-
-kubectl apply -f k8s-manifests/10-notification-service.yaml
-
-kubectl apply -f k8s-manifests/11-analytics-service.yaml
-
-kubectl apply -f k8s-manifests/12-search-service.yaml
-
-kubectl apply -f k8s-manifests/13-api-gateway.yaml
-
-kubectl apply -f k8s-manifests/14-ui-service.yaml
-
-kubectl apply -f k8s-manifests/15-ingress.yaml
-
-kubectl apply -f k8s-manifests/16-hpa.yaml
 ```
-
----
-
-# ✅ Verify
-
-## Check Pods
-
-```bash
 kubectl get pods -n cloudverse
-```
-
----
-
-## Check Services
-
-```bash
-kubectl get svc -n cloudverse
-```
-
----
-
-## Check Ingress
-
-```bash
+kubectl get services -n cloudverse
 kubectl get ingress -n cloudverse
 ```
 
----
+Open in browser:
 
-# 🧪 Useful Commands
-
-## Watch Pods
-
-```bash
-kubectl get pods -n cloudverse -w
+```
+http://<ALB-DNS>
 ```
 
----
+Login:
 
-## View Logs
-
-```bash
-kubectl logs -n cloudverse -l app=auth-service
-
-kubectl logs -n cloudverse -l app=order-service
 ```
-
----
-
-## Scale Deployment
-
-```bash
-kubectl scale deployment product-service \
---replicas=4 \
--n cloudverse
+admin / admin123
 ```
 
 ---
 
 # 🧹 Cleanup
 
-```bash
+```
 kubectl delete namespace cloudverse
 ```
+
+Delete ECR repositories:
+
+```
+aws ecr delete-repository --repository-name cloudverse/ui-service --force --region us-east-1
+```
+
+(Repeat for all services.)
 
 ---
 
 # 👨‍💻 Maintained By
 
-Hiqode DevOps Team
+Hiqode DevOps Team  
+Part of the Hiqode DevOps Training Series  
 
-Docker → ECR → Kubernetes (EKS)
+Docker → ECR → Kubernetes (EKS) — Real‑World Microservices Platform
