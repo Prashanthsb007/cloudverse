@@ -9,7 +9,7 @@
 
 When you delete an EKS cluster:
 
-```bash
+```
 eksctl delete cluster --name my-eks-cluster --region us-east-1
 ````
 
