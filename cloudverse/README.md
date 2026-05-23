@@ -121,6 +121,21 @@ kubectl get nodes
 ```
 export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 export AWS_REGION=us-east-1
+echo "Account ID: $AWS_ACCOUNT_ID"
+
+aws ecr create-repository --repository-name cloudverse/ui-service           --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/api-gateway          --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/auth-service         --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/user-service         --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/product-service      --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/order-service        --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/cart-service         --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/notification-service --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/analytics-service    --region $AWS_REGION
+aws ecr create-repository --repository-name cloudverse/search-service       --region $AWS_REGION
+
+echo "✅ All 10 ECR repositories created!"
+
 ```
 
 (Create all 10 repositories exactly as defined earlier.)
@@ -129,7 +144,104 @@ export AWS_REGION=us-east-1
 
 # 🐳 PHASE 3 — Clone, Build, Tag and Push
 
-(Full detailed build commands for all 10 services go here — unchanged from previous correct section.)
+## Step 7 — Clone the Repository
+
+```
+git clone https://github.com/<your-org>/cloudverse.git
+cd cloudverse
+```
+
+## Step 8 — Authenticate Docker with ECR
+
+```
+aws ecr get-login-password --region us-east-1 \
+| docker login --username AWS \
+--password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
+```
+
+---
+
+## Step 9 — Build, Tag and Push All Images
+
+### 🖥️ UI Service
+
+```
+docker build -t cloudverse-ui ./services/ui
+docker tag cloudverse-ui:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/ui-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/ui-service:v1
+```
+
+### 🔀 API Gateway
+
+```
+docker build -t cloudverse-api-gateway ./services/api-gateway
+docker tag cloudverse-api-gateway:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/api-gateway:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/api-gateway:v1
+```
+
+### 🔐 Auth Service
+
+```
+docker build -t cloudverse-auth-service ./services/auth-service
+docker tag cloudverse-auth-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/auth-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/auth-service:v1
+```
+
+### 👤 User Service
+
+```
+docker build -t cloudverse-user-service ./services/user-service
+docker tag cloudverse-user-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/user-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/user-service:v1
+```
+
+### 🛍️ Product Service
+
+```
+docker build -t cloudverse-product-service ./services/product-service
+docker tag cloudverse-product-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/product-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/product-service:v1
+```
+
+### 📦 Order Service
+
+```
+docker build -t cloudverse-order-service ./services/order-service
+docker tag cloudverse-order-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/order-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/order-service:v1
+```
+
+### 🛒 Cart Service
+
+```
+docker build -t cloudverse-cart-service ./services/cart-service
+docker tag cloudverse-cart-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/cart-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/cart-service:v1
+```
+
+### 🔔 Notification Service
+
+```
+docker build -t cloudverse-notification-service ./services/notification-service
+docker tag cloudverse-notification-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/notification-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/notification-service:v1
+```
+
+### 📊 Analytics Service
+
+```
+docker build -t cloudverse-analytics-service ./services/analytics-service
+docker tag cloudverse-analytics-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/analytics-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/analytics-service:v1
+```
+
+### 🔍 Search Service
+
+```
+docker build -t cloudverse-search-service ./services/search-service
+docker tag cloudverse-search-service:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/search-service:v1
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/search-service:v1
+```
 
 ---
 
@@ -137,6 +249,8 @@ export AWS_REGION=us-east-1
 
 ```
 sed -i "s/YOUR_ACCOUNT_ID/${AWS_ACCOUNT_ID}/g" k8s-manifests/*.yaml
+grep "ecr" k8s-manifests/05-auth-service.yaml
+
 ```
 
 ---
