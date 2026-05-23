@@ -248,6 +248,8 @@ docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cloudverse/search-
 # 🔖 PHASE 4 — Update Image URIs
 
 ```
+export AWS_ACCOUNT_ID=865189140490   #replace with your AWS account Id
+echo $AWS_ACCOUNT_ID -- Expected:865189140490
 sed -i "s/YOUR_ACCOUNT_ID/${AWS_ACCOUNT_ID}/g" k8s-manifests/*.yaml
 grep "ecr" k8s-manifests/05-auth-service.yaml
 
