@@ -35,7 +35,7 @@ spec:
       resource:
         name: cpu
         target:
-          type:               AverageUtilization
+          type: Utilization
           averageUtilization: 60
 ---
 apiVersion: autoscaling/v2
@@ -55,7 +55,7 @@ spec:
       resource:
         name: cpu
         target:
-          type:               AverageUtilization
+          type: Utilization
           averageUtilization: 60
 ---
 apiVersion: autoscaling/v2
@@ -75,5 +75,5 @@ spec:
       resource:
         name: cpu
         target:
-          type:               AverageUtilization
+          type: Utilization
           averageUtilization: 60
